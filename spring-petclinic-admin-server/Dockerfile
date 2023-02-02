@@ -13,3 +13,4 @@ EXPOSE ${EXPOSED_PORT}
 # buradaki expose ile belirtilen port bilgi amacli sadece metadata icin, hicbir seye etkisi yok
 ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar"]
 # Linux sistemlerde "/dev/./urandom" file bulunuyor. urandom havuz dolmadan bize eldeki entropiden veri alir ve bize verir. random havuz dolmadan bize bir veri döndürmez. Ancak random urandom a göre daha kuvvetli ve güvenli sifre vermis oluyor.
+# "-Djava.security.egd=file:/dev/./urandom" java nin security parametresi

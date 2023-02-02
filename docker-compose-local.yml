@@ -1,0 +1,129 @@
+version: '2'
+# version:2 yazmamizin sebebi: asagida mem_limit parametresi ile ilgili yapilan aciklamalarda deginildi. Özetle version:3 kullanacak olursak mem_limit parametresini kullanamiyoruz.
+
+services: 
+  config-server:
+    image: petclinic-config-server:dev
+    container_name: config-server
+    mem_limit: 512M
+    # mem_limit parametresi ile kaynak kullanimini sinirlandiriyoruz
+    # mem_limit version:2 de var
+    # version:3 de; resources bölümü getirildi. Ancak bu deploy altinda kullanilabiliyor. Bunun icinde docker swarm da kullanabiliyoruz. Yani docker compose da bunu kullanamiyoruz
+    ports: 
+      - 8888:8888
+
+  discovery-server:
+    image: petclinic-discovery-server:dev
+    container_name: discovery-server
+    mem_limit: 512M
+    ports: 
+      - 8761:8761
+    depends_on: 
+    # bu container ayaga kalkarken config-server container inin ayaga kalkmasini bekleyecek. Bu sadece config-server ayaga kalkti mi kalkmadi mi ona bakiyor
+      - config-server
+    entrypoint: ["./dockerize", "-wait=tcp://config-server:8888", "-timeout=160s", "--", "java", "-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar"]
+    # sadece config-server in ayaga kalmasi yeterli degil, ayni zamanda config-server icerisindeki app aktif hale geldi mi, calisiyor mu bu da bizim icin gerekli. Bu maksatla da burada "entrypoint" i kullaniyoruz. Bunu da dockerize tool sayesinde yapabiliyoruz.
+    # "--" ye kadar olan komut dockerize komutu. "--" dan sonraki komut ise discovery-server un Dockerfile daki entrypoint kisminda yazan komutun aynisi. Bu son komut aslinda normal app imizi calistiran komut.
+    # docker-compose icersininde yazilan bu kisimda ayni zamanda overwrite yapmis ve Dockerfile daki komutu bu sekilde degistirmis oluyorum
+    # diger bir ifade ile defacto olarak Dockerfile icerisindeki entrypoint komutu degil burada yazdigimiz entrypoint komutu calisiyor
+  
+  customers-service:
+    image: petclinic-customers-service:dev
+    container_name: customers-service
+    mem_limit: 512M
+    ports:
+     - 8081:8081  # ilk port service in, ikinci port container in
+    depends_on: 
+      # belki sadece discovery-server yazilsa yeterli olabilir. Cünkü zaten discovery-server config-server i bekliyor
+     - config-server
+     - discovery-server
+    entrypoint: ["./dockerize", "-wait=tcp://discovery-server:8761", "-timeout=160s", "--", "java", "-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar" ]
+  
+  visits-service:
+    image: petclinic-visits-service:dev
+    container_name: visits-service
+    mem_limit: 512M
+    ports:
+     - 8082:8082
+    depends_on: 
+     - config-server
+     - discovery-server
+    entrypoint: ["./dockerize", "-wait=tcp://discovery-server:8761", "-timeout=160s", "--", "java", "-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar" ]
+  
+  vets-service:
+    image: petclinic-vets-service:dev
+    container_name: vets-service
+    mem_limit: 512M
+    ports:
+     - 8083:8083
+    depends_on: 
+     - config-server
+     - discovery-server
+    entrypoint: ["./dockerize", "-wait=tcp://discovery-server:8761", "-timeout=160s", "--", "java", "-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar" ]
+  
+  api-gateway:
+    image: petclinic-api-gateway:dev
+    container_name: api-gateway
+    mem_limit: 512M
+    ports:
+     - 8080:8080
+    depends_on: 
+     - config-server
+     - discovery-server
+    entrypoint: ["./dockerize", "-wait=tcp://discovery-server:8761", "-timeout=160s", "--", "java", "-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar" ]
+  
+  admin-server:
+    image: petclinic-admin-server:dev
+    container_name: admin-server
+    mem_limit: 512M
+    ports:
+     - 9090:9090
+    depends_on: 
+     - config-server
+     - discovery-server
+    entrypoint: ["./dockerize", "-wait=tcp://discovery-server:8761", "-timeout=160s", "--", "java", "-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar" ]
+
+  hystrix-dashboard:
+    image: petclinic-hystrix-dashboard:dev
+    container_name: hystrix-dashboard
+    mem_limit: 512M
+    ports:
+     - 7979:7979
+    depends_on: 
+     - config-server
+     - discovery-server
+    entrypoint: ["./dockerize", "-wait=tcp://discovery-server:8761", "-timeout=160s", "--", "java", "-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar" ]
+
+  tracing-server:
+    image: openzipkin/zipkin
+    container_name: tracing-server
+    mem_limit: 512M
+    environment:
+    # java 8 ve 11 de bir bug var. Bu bug i kapatmak icin asagidaki environment i eklemis olduk
+    - JAVA_OPTS=-XX:+UnlockExperimentalVMOptions -Djava.security.egd=file:/dev/./urandom
+    ports:
+     - 9411:9411 
+  
+  grafana-server:
+    image: petclinic-grafana-server:dev
+    container_name: grafana-server
+    mem_limit: 256M
+    ports:
+    - 3000:3000
+
+  prometheus-server:
+    image: petclinic-prometheus-server:dev
+    container_name: prometheus-server
+    mem_limit: 256M
+    ports:
+    - 9091:9090
+
+  mysql-server:
+    image: mysql:5.7.8
+    container_name: mysql-server
+    environment: 
+      MYSQL_ROOT_PASSWORD: petclinic
+      MYSQL_DATABASE: petclinic
+    mem_limit: 256M
+    ports:
+    - 3306:3306
