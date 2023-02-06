@@ -157,11 +157,11 @@ resource "aws_instance" "kube-master" {
     iam_instance_profile = module.iam.master_profile_name
     vpc_security_group_ids = [aws_security_group.petclinic-kube-master-sg.id, aws_security_group.petclinic-mutual-sg.id]
     key_name = "clarus"
-    subnet_id = "subnet-c41ba589"  # select own subnet_id of us-east-1a
+    subnet_id = "subnet-00e5f67dc6ba35f5b"  # select own subnet_id of us-east-1a
     availability_zone = "us-east-1a"
     tags = {
         Name = "kube-master"
-        "kubernetes.io/cluster/petclinicCluster" = "owned"
+        "kubernetes.io/cluster/petclinicCluster" = "owned"  # <kubernetes.io/cluster/> bu kisim sabit, bundan sonraki kisma cluster id deniliyor ve istedigimiz bir isim verebiliyoruz. Cluster icerisindeki diger node lara da ayni ismi veriyoruz.
         Project = "tera-kube-ans"
         Role = "master"
         Id = "1"
@@ -175,7 +175,7 @@ resource "aws_instance" "worker-1" {
         iam_instance_profile = module.iam.worker_profile_name
     vpc_security_group_ids = [aws_security_group.petclinic-kube-worker-sg.id, aws_security_group.petclinic-mutual-sg.id]
     key_name = "clarus"
-    subnet_id = "subnet-c41ba589"  # select own subnet_id of us-east-1a
+    subnet_id = "subnet-00e5f67dc6ba35f5b"  # select own subnet_id of us-east-1a
     availability_zone = "us-east-1a"
     tags = {
         Name = "worker-1"
@@ -193,7 +193,7 @@ resource "aws_instance" "worker-2" {
     iam_instance_profile = module.iam.worker_profile_name
     vpc_security_group_ids = [aws_security_group.petclinic-kube-worker-sg.id, aws_security_group.petclinic-mutual-sg.id]
     key_name = "clarus"
-    subnet_id = "subnet-c41ba589"  # select own subnet_id of us-east-1a
+    subnet_id = "subnet-00e5f67dc6ba35f5b"  # select own subnet_id of us-east-1a
     availability_zone = "us-east-1a"
     tags = {
         Name = "worker-2"
