@@ -1,4 +1,4 @@
-plugin: aws_ec2
+plugin: aws_ec2   # bu plugin filters a göre bütün EC2 lari "aws_ec2" altinda grupluyor. Tag lere göre de biz gruplamis olduk
 regions:
   - "us-east-1"
 filters:
@@ -13,4 +13,4 @@ keyed_groups:
 hostnames:
   - "ip-address"
 compose:
-  ansible_user: "'ubuntu'"
+  ansible_user: "'ubuntu'"    # ansible user inin ubuntu ya baglanmasini saglamis oluyoruz
