@@ -1,14 +1,22 @@
 - hosts: all
-  become: true
+  become: true  # root yetkisi veriyor. Asagidaki islemleri root yetkisi ile yapiyoruz.
   tasks:
 
   - name: change hostnames
     shell: "hostnamectl set-hostname {{ hostvars[inventory_hostname]['private_dns_name'] }}"
+    # hostvars default variable lardan birisi. Belirttigimiz host lari hostvars altinda tanimliyor
+    # bu sekilde hostname lerini dynamic bir sekilde ayarlamis oluyorum. Örnegimizde 3 nodes var.
 
-  - name: swap off
+  - name: swap off    
     shell: |
       free -m
       swapoff -a && sed -i '/ swap / s/^/#/' /etc/fstab
+    # AWS EC2 larda swap alani yok. Normalde kullanicilar tüm verileri RAM den aliyor. RAM gecici bellek. Bilgisayar kapaninca buradaki bilgiler gidiyor. 3 cesit bellek var: cache (islemcinin ön bellegi ve en hizli), ram (hizli) ve hard disk (yavas). Hard disk yavas calisir. Buradan bilgiler daha hizli olan ram e aktarilir. Ama ram sinirlidir ve hard diske göre kücüktür (örnegin 16 gb gibi). 
+    # ram dolunca, ram ram deki bazi verileri ram formatinda swap alanina aktariyor. Tekrar kullanma durumumuz olursa; ram bu verileri swap ten alir ve dogrudan kullanir. swap gecici ram depolama alani diyebiliriz. swap bilgisayarin performansini azaltmaktadir.
+    # swap icin ayrilan bölüme erisme sansimiz yok.
+    # AWS instance larda swap alani yok.
+    # kubernetes swap kullanimi istemiyor, performans düsüklügü yasamamak icin
+    # performans düsmesini engellemek icin bunu yaptik
 
   - name: Enable the nodes to see bridged traffic
     shell: |
@@ -38,7 +46,9 @@
       echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list && \
       apt-get update -q && \
       apt-get install -qy kubelet=1.23.5-00 kubectl=1.23.5-00 kubeadm=1.23.5-00 docker.io
+    # gpg bir token. Güvenlik nedeniyle gpg yi indiriyoruz.
 
+  # ubuntu kullanicisi olarak login oluyoruz. bu nedenle ubuntu user ini docker group a ekliyoruz.
   - name: Add ubuntu to docker group
     user:
       name: ubuntu
@@ -61,6 +71,7 @@
       sudo systemctl restart kubelet
 
 
+# burada master node ile ilgili config ayarlarini yapiyoruz
 - hosts: role_master
   tasks:
       
@@ -74,17 +85,21 @@
       src: ./clusterconfig-base.yml
       dest: /home/ubuntu/
   
+  # gettext-base tool ü yükleniyor
   - name: get gettext-base
     become: true
     apt:
       package: gettext-base
       state: present
 
+  # buradaki hostvars "role_master" host undan geliyor.
+  # "envsubst" komutu ile place holder yerine gercek degerini yazdir ve bu haliyle yeni bir file olustur diyoruz. Bu sekilde template olan file degismeden yeni bir file icerisinde environment variable larin gercek degerini yazdirmis oluyoruz.
   - name: change controlplane_endpoint and produce the clusterconfig.yml file
     shell: |
       export CONTROLPLANE_ENDPOINT={{ hostvars[inventory_hostname]['private_ip_address'] }}
       envsubst < /home/ubuntu/clusterconfig-base.yml > /home/ubuntu/clusterconfig.yml
 
+  # kubeadm i burada initialize ediyoruz
   - name: initialize the Kubernetes cluster using kubeadm
     become: true
     shell: |
@@ -96,7 +111,7 @@
     with_items:
      - mkdir -p /home/ubuntu/.kube
      - cp -i /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
-     - chown ubuntu:ubuntu /home/ubuntu/.kube/config
+     - chown ubuntu:ubuntu /home/ubuntu/.kube/config  # bu sekilde file in owner ligini ubuntu user ina verdik. Artik sudo ile root yetkisinde kubectl yapsak bile calistiramayiz.
 
   - name: Install flannel pod network
     shell: kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
@@ -109,14 +124,17 @@
   - debug: msg='{{ join_command_for_workers.stdout.strip() }}'
 
   - name: register join command for workers
-    add_host:
+    add_host: # host üretiyoruz/ekliyoruz. Ismi de "kube_master". Bu normal olusturdugumuz master node dan farkli bir node. Bizim master node umuzun ismi kube-master. Burada olusturdugumuz host un ismi kube_master. Bu ismi baska sekilde de verebilirdik.
       name: "kube_master"
-      worker_join: "{{ join_command_for_workers.stdout.strip() }}"
+      worker_join: "{{ join_command_for_workers.stdout.strip() }}"  # burada da olusturdugumuz bu host a bir attribute atadik
+  # join token ini master node da olusturduk. worker node da join token i calistirmamiz gerekiyor. Bu maksatla: 1. token i S3 at oradan cek. 2. baska bir host olusturup buna worker_join seklinde attribute atiyoruz. Bu bir linux komutu oldugu icin worker node da bu attribute u cagirinca linux komutu calismis olacak. Bunu yapmamizin sebebi; bir play den baska bir play e deger atayamiyorum. Bu sorunu asmak icin host olusturmus oluyoruz. play ler arasi host lar kullanilabiliyor.
+  # "stdout" ekran ciktisi yani ekrana yazilan sonuc/cikti demektir.
 
 - hosts: role_worker
   become: true
   tasks:
 
+  # join command i calistirmis oluyoruz. Bu sayede worker node cluster a dahil edilmis oluyor.
   - name: Join workers to cluster
     shell: "{{ hostvars['kube_master']['worker_join'] }}"
     register: result_of_joining
@@ -125,6 +143,7 @@
   become: false
   tasks:
 
+  # K8s de "patch" komutu; yaml file larini edit etmeye modify etmeye yariyor.
   - name: Patch the instances
     become: false
     shell: |
@@ -133,6 +152,7 @@
       kubectl patch node {{ hostvars[groups['role_worker'][0]]['private_dns_name'] }} -p '{"spec":{"providerID":"aws:///us-east-1a/{{ hostvars[groups['role_worker'][0]]['instance_id'] }}" }}'
       kubectl patch node {{ hostvars[groups['role_worker'][1]]['private_dns_name'] }} -p '{"spec":{"providerID":"aws:///us-east-1a/{{ hostvars[groups['role_worker'][1]]['instance_id'] }}" }}'
 
+  # cloud control manager i helm ile install ediyoruz
   - name: Deploy the required cloud-controller-manager 
     shell: |
       cd /home/ubuntu
@@ -142,6 +162,7 @@
       helm repo add aws-cloud-controller-manager https://kubernetes.github.io/cloud-provider-aws
       helm repo update
       helm upgrade --install aws-cloud-controller-manager aws-cloud-controller-manager/aws-cloud-controller-manager --set image.tag=v1.20.0-alpha.0
-      
+
+  # burada Nginx Ingress i install ediyoruz    
   - name: Deploy Nginx Ingress 
     shell: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.2/deploy/static/provider/aws/deploy.yaml
