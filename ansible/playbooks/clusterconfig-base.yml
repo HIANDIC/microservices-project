@@ -1,0 +1,24 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: v1.23.5
+controlPlaneEndpoint: ${CONTROLPLANE_ENDPOINT}  # normalde master node un ip sini bilmiyoruz. Bu yüzden buraya bir placeholder koyuyoruz
+networking:
+  podSubnet: 10.244.0.0/16    # burada network icin flannel kullaniyoruz. Flunnel in subnet CIDR blogu bu oldugu icin bu sekilde yazdik.
+apiServer:
+  extraArgs:
+    cloud-provider: external  # cloud üzerindeki resource lari kullan diyoruz. external yazmasak default olarak kendi load balancer ini kullanir
+controllerManager:
+  extraArgs:
+    cloud-provider: external
+---
+# ikinci kisimda da initConfiguration islemlerini yapiyoru.
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+nodeRegistration:
+  kubeletExtraArgs:
+    cloud-provider: external
+---
+# ücüncü kisimda ise kubelet config yapiyoruz
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+cgroupDriver: systemd # linux de systemd kernel i kumanda etmeye yarayan bir tool. Daha önce cgroupfs vardi. Container runtime docker deamon i dir. Docker deamon da systemd yi kullanmaktadir. Diger container cözümleri de default olarak systemd yi kullanmaktadir.
