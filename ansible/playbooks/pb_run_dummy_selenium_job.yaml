@@ -1,0 +1,14 @@
+- hosts: all
+  tasks:
+  - name: run dummy selenium job
+    shell: "docker run --rm -v {{ workspace }}:{{ workspace }} -w {{ workspace }} callahanclarus/selenium-py-chrome:latest python {{ item }}"
+    # container run etmek icin kullandigi image: callahanclarus/selenium-py-chrome:latest
+    # {{ item }} ile bir alt satirda tanimlanan "dummy ile baslayan ve uzantisi .py olan file"
+    # ilk workspace icerisinde bulundugum makine/host; ikinci workspace ise 
+    with_fileglob: "{{ workspace }}/selenium-jobs/dummy*.py"  # dummy ile baslayan ve uzantisi .py olan file i calistiriyor
+    # with_fileglob; ile tanimladigimiz directory deki file lar bir döngü gibi hepsi de isleme aliniyor ve yukaridaki satirda oldugu gibi {{ item }} ile birlikte kullaniliyor
+    register: output
+  
+  - name: show results
+    debug: msg="{{ item.stdout }}"
+    with_items: "{{ output.results }}"
