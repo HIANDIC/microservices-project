@@ -97,7 +97,7 @@ pipeline {
                     echo "Kubernetes Master is not UP and running yet."
                     // aws ec2 describe ile instance in id sini aliyorum
                     // önce master node un olusturulmasi gerekiyor, o nedenle bu islemi yapiyor ve master in hazir olmasini bekliyorum
-                    env.id = sh(script: 'aws ec2 describe-instances --filters Name=tag-value,Values=master Name=tag-value,Values=tera-kube-ans Name=instance-state-name,Values=running --query Reservations[*].Instances[*].[InstanceId] --output text',  returnStdout:true).trim()
+                    env.id = sh(script: 'aws ec2 describe-instances --filters Name=tag-value,Values=master Name=tag-value,Values=de-tr-tera-kube-ans Name=instance-state-name,Values=running --query Reservations[*].Instances[*].[InstanceId] --output text',  returnStdout:true).trim()
                     sh 'aws ec2 wait instance-status-ok --instance-ids $id'
                 }
             }
