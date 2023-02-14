@@ -74,6 +74,20 @@
         </dependencies>
     </dependencyManagement>
 
+    <!-- version etikendinde SNAPSHOT i görürse snapshot a bunun haricindekilerin hepsini de release gönderiyor. -->
+    <distributionManagement>
+  <repository>
+    <id>nexus</id>
+    <name>maven-releases</name>
+    <url>http://172.31.16.90:8081/repository/maven-releases/</url>
+  </repository>
+  <snapshotRepository>
+    <id>nexus</id>
+    <name>maven-snapshots</name>
+    <url>http://172.31.16.90:8081/repository/maven-snapshots/</url>
+  </snapshotRepository>
+</distributionManagement>
+
     <profiles>
         <profile>
             <id>springboot</id>
